@@ -13,28 +13,24 @@ load_dotenv()
 db_name = os.getenv('DB_NAME', '주가 추이 확인')
 st.header(db_name)
 
-# --- 1. 세션 상태 초기화 ---
+# --- 1. 세션 상태 초기화 (클릭 이벤트 유지용) ---
 if 'company_name' not in st.session_state:
     st.session_state.company_name = ""
 if 'auto_submit' not in st.session_state:
     st.session_state.auto_submit = False
 
 # --- 2. 데이터 관련 함수 ---
-
 @st.cache_data(ttl=3600)
 def get_fixed_top_10():
-    """정해진 대표 주식 10개의 현재가와 등락률을 가져옵니다."""
-    # 직접 지정한 대표 종목 10개 (종목명: 종목코드)
+    """대표 주식 10개의 현재가와 등락률 계산"""
     stocks = {
         '삼성전자': '005930', 'SK하이닉스': '000660', 'LG에너지솔루션': '373220',
         '삼성바이오로직스': '207940', '현대차': '005380', '기아': '000270',
         '셀트리온': '068270', 'KB금융': '105560', 'NAVER': '035420', '신한지주': '055550'
     }
-    
     results = []
     for name, code in stocks.items():
         try:
-            # 최근 2일치 데이터를 가져와서 어제 종가 대비 등락 계산
             df = fdr.DataReader(code, (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))
             if not df.empty:
                 current_price = df['Close'].iloc[-1]
@@ -66,9 +62,7 @@ def get_stock_code_by_company(company_name: str) -> str:
     else:
         raise ValueError(f"'{company_name}'을 찾을 수 없습니다.")
 
-# --- 3. 사이드바 UI ---
-
-# (A) 입력창 및 날짜
+# --- 3. 사이드바 UI 구성 ---
 company_name_input = st.sidebar.text_input(
     '조회할 회사를 입력하세요', 
     value=st.session_state.company_name,
@@ -82,12 +76,9 @@ selected_dates = st.sidebar.date_input(
     format="YYYY.MM.DD",
 )
 
-# (B) 조회하기 버튼
 confirm_btn = st.sidebar.button('조회하기', use_container_width=True)
 
 st.sidebar.markdown("---")
-
-# (C) 대표 주식 10선 (버튼 하단 배치)
 st.sidebar.markdown("### 주요 종목 10선")
 top_df = get_fixed_top_10()
 
@@ -99,6 +90,7 @@ if not top_df.empty:
 
     for i, row in top_df.iterrows():
         cols = st.sidebar.columns([2, 1, 1])
+        # 종목 버튼 클릭 시 세션 업데이트 및 리런
         if cols[0].button(row['Name'], key=f"top_btn_{i}"):
             st.session_state.company_name = row['Name']
             st.session_state.auto_submit = True
@@ -107,19 +99,20 @@ if not top_df.empty:
         color = "red" if row['ChgRate'] > 0 else "blue" if row['ChgRate'] < 0 else "white"
         cols[1].write(f"{int(row['Close']):,}")
         cols[2].markdown(f":{color}[{row['ChgRate']:.1f}%]")
-else:
-    st.sidebar.write("종목 정보를 불러오는 중...")
 
 # --- 4. 메인 분석 로직 ---
+# 버튼 클릭 또는 사이드바 종목 클릭 시 실행
 if confirm_btn or st.session_state.auto_submit:
-    st.session_state.auto_submit = False
+    # 검색 타겟 결정
+    search_target = st.session_state.company_name if st.session_state.auto_submit else company_name_input
+    st.session_state.auto_submit = False  # 플래그 초기화
     
-    if not company_name_input:
+    if not search_target:
         st.warning("회사 이름을 입력해 주세요.")
     else:
         try:
-            with st.spinner('차트를 생성하는 중...'):
-                stock_code = get_stock_code_by_company(company_name_input)
+            with st.spinner(f'{search_target} 데이터를 분석 중...'):
+                stock_code = get_stock_code_by_company(search_target)
                 start_date = selected_dates[0].strftime("%Y%m%d")
                 end_date = selected_dates[1].strftime("%Y%m%d")
                 price_df = fdr.DataReader(stock_code, start_date, end_date)
@@ -127,15 +120,15 @@ if confirm_btn or st.session_state.auto_submit:
             if price_df.empty:
                 st.info("데이터가 없습니다.")
             else:
-                st.subheader(f"{company_name_input} 분석 결과")
+                st.subheader(f"{search_target} 분석 결과")
                 
-                # 지표 계산
+                # 차트용 지표 계산
                 price_df['MA5'] = price_df['Close'].rolling(5).mean()
                 price_df['MA20'] = price_df['Close'].rolling(20).mean()
                 price_df['MA60'] = price_df['Close'].rolling(60).mean()
                 price_df['MA120'] = price_df['Close'].rolling(120).mean()
 
-                # 서브플롯 (캔들 + 거래량)
+                # 서브플롯 구성 (캔들 + 거래량)
                 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                                     vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
@@ -145,7 +138,8 @@ if confirm_btn or st.session_state.auto_submit:
                     increasing_line_color='red', decreasing_line_color='blue'
                 ), row=1, col=1)
 
-                for ma, color in [('MA5', 'green'), ('MA20', 'red'), ('MA60', 'orange'), ('MA120', 'purple')]:
+                ma_list = [('MA5', 'green'), ('MA20', 'red'), ('MA60', 'orange'), ('MA120', 'purple')]
+                for ma, color in ma_list:
                     fig.add_trace(go.Scatter(x=price_df.index, y=price_df[ma], name=ma, 
                                              line=dict(color=color, width=1)), row=1, col=1)
 
@@ -160,7 +154,7 @@ if confirm_btn or st.session_state.auto_submit:
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     price_df.to_excel(writer, index=True)
-                st.download_button("📥 엑셀 다운로드", output.getvalue(), f"{company_name_input}.xlsx")
+                st.download_button("📥 엑셀 다운로드", output.getvalue(), f"{search_target}.xlsx")
 
         except Exception as e:
-            st.error(f"오류: {e}")
+            st.error(f"오류가 발생했습니다: {e}")
