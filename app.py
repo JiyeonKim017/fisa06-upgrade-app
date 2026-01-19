@@ -23,17 +23,19 @@ if 'auto_submit' not in st.session_state:
     st.session_state.auto_submit = False
 
 # --- 데이터 획득 함수 ---
-@st.cache_data(ttl=3600)
+# 캐시 TTL을 60초로 줄여 실시간성을 확보합니다.
+@st.cache_data(ttl=60)
 def get_fixed_top_10():
     stocks = {
         '삼성전자': '005930', 'SK하이닉스': '000660', 'LG에너지솔루션': '373220',
-        '삼성바이오로직스': '207940', '현대자동차': '005380', '기아': '000270',
+        '삼성바이오로직스': '207940', '현대차': '005380', '기아': '000270',
         '셀트리온': '068270', 'KB금융': '105560', 'NAVER': '035420', '신한지주': '055550'
     }
     results = []
     for name, code in stocks.items():
         try:
-            df = fdr.DataReader(code, (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))
+            # 실시간 반영을 위해 최근 3일치 데이터를 가져와 마지막 행을 추출
+            df = fdr.DataReader(code, (datetime.datetime.now() - datetime.timedelta(days=3)).strftime('%Y-%m-%d'))
             if not df.empty:
                 current_price = df['Close'].iloc[-1]
                 prev_price = df['Close'].iloc[-2]
@@ -96,6 +98,7 @@ st.sidebar.markdown("### 주요 종목 10선")
 st.sidebar.caption("주식명을 클릭하면 자동 검색됩니다.")
 
 with st.sidebar:
+    # 60초마다 갱신되므로 훨씬 정확한 종가를 보여줍니다.
     with st.spinner("주요 주식 10선 데이터 수집 중..."):
         top_df = get_fixed_top_10()
 
@@ -119,6 +122,7 @@ if not top_df.empty:
         else:
             color_str = f"{row['ChgRate']:.1f}%"
             
+        # 종가 표시 (천 단위 콤마 추가)
         cols[1].write(f"{int(row['Close']):,}")
         cols[2].markdown(color_str)
 
@@ -139,16 +143,13 @@ if confirm_btn or st.session_state.auto_submit:
                 if not price_df.empty:
                     st.subheader(f"{target} 분석 결과")
                     
-                    # --- 수정 포인트: 전체 데이터 로드 및 스크롤 설정 ---
-                    st.write("전체 데이터 내역")
-                    # height를 지정하면 해당 높이를 넘을 경우 자동으로 내부 스크롤이 생깁니다.
-                    st.dataframe(price_df.sort_index(ascending=False), use_container_width=True, height=300)
+                    st.write("전체 데이터 내역 (스크롤 가능)")
+                    # 최신순 정렬 + 스크롤 높이 지정
+                    st.dataframe(price_df.sort_index(ascending=False), use_container_width=True, height=350)
 
-                    # 지표 계산
                     for n in [5, 20, 60, 120]:
                         price_df[f'MA{n}'] = price_df['Close'].rolling(n).mean()
 
-                    # 차트 생성
                     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                                         vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
@@ -166,7 +167,6 @@ if confirm_btn or st.session_state.auto_submit:
                     fig.add_trace(go.Bar(x=price_df.index, y=price_df['Volume'], name="거래량", 
                                          marker_color=v_colors), row=2, col=1)
 
-                    # 빈 공간 제거
                     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
                     all_days = pd.date_range(start=price_df.index[0], end=price_df.index[-1])
                     holidays = all_days.difference(price_df.index)
@@ -185,5 +185,3 @@ if confirm_btn or st.session_state.auto_submit:
                 st.error(f"데이터 조회 중 오류 발생: {e}")
         else:
             st.error("종목 코드를 찾을 수 없습니다.")
-    else:
-        st.warning("회사명을 입력하세요.")
