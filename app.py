@@ -23,6 +23,7 @@ if 'company_name' not in st.session_state:
 if 'auto_submit' not in st.session_state:
     st.session_state.auto_submit = False
 
+
 # --- 데이터 획득 함수 ---
 @st.cache_data(ttl=3600)
 def get_fixed_top_10():
