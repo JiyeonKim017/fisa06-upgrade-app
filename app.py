@@ -56,6 +56,57 @@ selected_dates = st.sidebar.date_input(
     (jan_1, today),
     format="YYYY.MM.DD",
 )
+
+
+# --- [신규 추가] 시가총액 TOP 10 목록 및 클릭 이벤트 ---
+st.sidebar.markdown("### 시가총액 TOP 10")
+
+# 세션 상태 초기화 (클릭 시 자동 조회를 위함)
+if 'company_name' not in st.session_state:
+    st.session_state.company_name = ""
+if 'auto_submit' not in st.session_state:
+    st.session_state.auto_submit = False
+
+@st.cache_data
+def get_top_10_stocks():
+    # 실시간 시가총액 순위 데이터 가져오기
+    df = fdr.StockListing('KRX')
+    top_10 = df.sort_values(by='Marcap', ascending=False).head(10)
+    return top_10[['Name', 'Close', 'ChgRate']]
+
+try:
+    top_df = get_top_10_stocks()
+    
+    # 표 헤더 출력
+    cols_header = st.sidebar.columns([2, 1, 1])
+    cols_header[0].caption("주식명")
+    cols_header[1].caption("종가")
+    cols_header[2].caption("등락률")
+
+    # 상위 10개 종목 반복 출력
+    for i, row in top_df.iterrows():
+        cols = st.sidebar.columns([2, 1, 1])
+        
+        # 1. 주식명 버튼 (클릭 시 세션 상태 업데이트 및 재실행)
+        if cols[0].button(row['Name'], key=f"top_{i}"):
+            st.session_state.company_name = row['Name']
+            st.session_state.auto_submit = True
+            st.rerun()
+            
+        # 2. 종가 및 등락률 (상승/하락 색상 적용)
+        color = "red" if row['ChgRate'] > 0 else "blue" if row['ChgRate'] < 0 else "white"
+        cols[1].write(f"{int(row['Close']):,}")
+        cols[2].markdown(f":{color}[{row['ChgRate']:.2f}%]")
+
+except Exception as e:
+    st.sidebar.error("TOP 10 목록을 불러올 수 없습니다.")
+
+st.sidebar.markdown("---")
+# --- [신규 추가 끝] ---
+
+# 이후 기존의 company_name 입력창 부분을 아래와 같이 'value'를 추가해 수정하세요.
+# company_name = st.sidebar.text_input('조회할 회사를 입력하세요', value=st.session_state.company_name)
+
 confirm_btn = st.sidebar.button('조회하기') # 클릭하면 True
 
 # 새로 만들기 - 한국 주식 top 10
