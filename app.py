@@ -154,3 +154,4 @@ if confirm_btn or st.session_state.auto_submit:
                 st.error(f"데이터 조회 중 오류 발생: {e}")
         else:
             st.error("종목 코드를 찾을 수 없습니다.")
+            
