@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 # --- 설정 및 세션 초기화 ---
 load_dotenv()
+st.set_page_config(page_title="주가 데이터 분석", layout="wide")
 st.header(os.getenv('DB_NAME', '주가 데이터 분석'))
 
 if 'company_name' not in st.session_state:
@@ -73,6 +74,8 @@ confirm_btn = st.sidebar.button('조회하기', use_container_width=True)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 주요 종목 10선")
+st.sidebar.caption("주식명을 클릭하면 자동 검색됩니다.") # 안내 문구 추가
+
 top_df = get_fixed_top_10()
 
 if not top_df.empty:
@@ -88,9 +91,16 @@ if not top_df.empty:
             st.session_state.auto_submit = True
             st.rerun()
         
-        color = "red" if row['ChgRate'] > 0 else "blue" if row['ChgRate'] < 0 else "white"
+        # 컬러 버그 수정: 등락률이 0일 때 대비
+        if row['ChgRate'] > 0:
+            color_str = f":red[{row['ChgRate']:.1f}%]"
+        elif row['ChgRate'] < 0:
+            color_str = f":blue[{row['ChgRate']:.1f}%]"
+        else:
+            color_str = f"{row['ChgRate']:.1f}%" # 0%일 때는 컬러 태그 없이 출력
+            
         cols[1].write(f"{int(row['Close']):,}")
-        cols[2].markdown(f":{color}[{row['ChgRate']:.1f}%]")
+        cols[2].markdown(color_str)
 
 # --- 메인 분석 로직 ---
 if confirm_btn or st.session_state.auto_submit:
@@ -108,11 +118,9 @@ if confirm_btn or st.session_state.auto_submit:
                 if not price_df.empty:
                     st.subheader(f"{target} 분석 결과")
                     
-                    # 데이터 표 출력
                     st.write("최근 데이터 내역")
                     st.dataframe(price_df.tail(5), use_container_width=True)
 
-                    # 지표 및 차트 생성
                     for n in [5, 20, 60, 120]:
                         price_df[f'MA{n}'] = price_df['Close'].rolling(n).mean()
 
@@ -136,7 +144,6 @@ if confirm_btn or st.session_state.auto_submit:
                     fig.update_layout(height=600, template="plotly_white", xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # 데이터 다운로드
                     out = BytesIO()
                     with pd.ExcelWriter(out, engine='openpyxl') as w:
                         price_df.to_excel(w, index=True)
@@ -147,5 +154,3 @@ if confirm_btn or st.session_state.auto_submit:
                 st.error(f"데이터 조회 중 오류 발생: {e}")
         else:
             st.error("종목 코드를 찾을 수 없습니다.")
-    else:
-        st.warning("회사명을 입력하세요.")
