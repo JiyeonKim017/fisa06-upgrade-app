@@ -44,7 +44,7 @@ def get_stock_code_by_company(company_name: str) -> str:
     else:
         raise ValueError(f"'{company_name}'을 찾을 수 없습니다. 종목코드 6자리를 직접 입력해보세요.")
 
-company_name = st.sidebar.text_input('조회할 회사를 입력하세요')
+#company_name = st.sidebar.text_input('조회할 회사를 입력하세요')
 #  v수정
 
 today = datetime.datetime.now()
