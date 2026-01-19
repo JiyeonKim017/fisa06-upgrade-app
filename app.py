@@ -23,7 +23,7 @@ if 'auto_submit' not in st.session_state:
 def get_fixed_top_10():
     stocks = {
         '삼성전자': '005930', 'SK하이닉스': '000660', 'LG에너지솔루션': '373220',
-        '삼성바이오로직스': '207940', '현대자동차': '005380', '기아': '000270',
+        '삼성바이오로직스': '207940', '현대차': '005380', '기아': '000270',
         '셀트리온': '068270', 'KB금융': '105560', 'NAVER': '035420', '신한지주': '055550'
     }
     results = []
@@ -76,7 +76,6 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("### 주요 종목 10선")
 st.sidebar.caption("주식명을 클릭하면 자동 검색됩니다.")
 
-# 로딩 문구 수정: spinner 사용
 with st.sidebar:
     with st.spinner("주요 주식 10선 데이터 수집 중..."):
         top_df = get_fixed_top_10()
@@ -94,7 +93,6 @@ if not top_df.empty:
             st.session_state.auto_submit = True
             st.rerun()
         
-        # 컬러 태그 수정 (0%일 때 버그 방지)
         if row['ChgRate'] > 0:
             color_str = f":red[{row['ChgRate']:.1f}%]"
         elif row['ChgRate'] < 0:
@@ -143,6 +141,15 @@ if confirm_btn or st.session_state.auto_submit:
                     v_colors = ['red' if price_df.Open[i] < price_df.Close[i] else 'blue' for i in range(len(price_df))]
                     fig.add_trace(go.Bar(x=price_df.index, y=price_df['Volume'], name="거래량", 
                                          marker_color=v_colors), row=2, col=1)
+
+                    # --- 휴장일(주말 및 공휴일) 제거 설정 ---
+                    # dvalue: "sat"은 토요일부터, 2는 이틀(토,일)을 의미
+                    fig.update_xaxes(
+                        rangebreaks=[
+                            dict(bounds=["sat", "mon"]), # 주말 제거
+                            dict(values=["2026-01-01", "2025-12-25"]) # 특정 공휴일 예시 (필요시 추가)
+                        ]
+                    )
 
                     fig.update_layout(height=600, template="plotly_white", xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
