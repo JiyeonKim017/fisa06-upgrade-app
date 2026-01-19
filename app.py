@@ -14,8 +14,8 @@ import koreanize_matplotlib
 import os
 from dotenv import load_dotenv
 load_dotenv()
-my_name = os.getenv('MY_NAME')
-st.header(my_name)
+db_name = os.getenv('DB_NAME')
+st.header(db_name)
 
 def get_krx_company_list() -> pd.DataFrame:
     try:
