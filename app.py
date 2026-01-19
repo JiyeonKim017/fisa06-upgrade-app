@@ -83,34 +83,56 @@ try:
     cols_header[1].caption("종가")
     cols_header[2].caption("등락률")
 
-    # 상위 10개 종목 반복 출력
+# --- [신규 추가 및 보완] 시가총액 TOP 10 목록 ---
+st.sidebar.markdown("### 시가총액 TOP 10")
+
+# 세션 상태 초기화
+if 'company_name' not in st.session_state:
+    st.session_state.company_name = ""
+if 'auto_submit' not in st.session_state:
+    st.session_state.auto_submit = False
+
+@st.cache_data(ttl=3600)  # 1시간 동안 결과 캐싱
+def get_top_10_stocks():
+    try:
+        # KRX 상장사 전체 목록 (시가총액 포함)
+        df = fdr.StockListing('KRX')
+        # 시가총액 순 정렬 후 상위 10개 추출
+        top_10 = df.sort_values(by='Marcap', ascending=False).head(10)
+        return top_10[['Name', 'Close', 'ChgRate']]
+    except Exception as e:
+        # 에러 발생 시 빈 데이터프레임 반환하여 메인 로직 방해 방지
+        return pd.DataFrame()
+
+top_df = get_top_10_stocks()
+
+if not top_df.empty:
+    # 헤더
+    h_cols = st.sidebar.columns([2, 1, 1])
+    h_cols[0].caption("주식명")
+    h_cols[1].caption("종가")
+    h_cols[2].caption("등락률")
+
     for i, row in top_df.iterrows():
         cols = st.sidebar.columns([2, 1, 1])
         
-        # 1. 주식명 버튼 (클릭 시 세션 상태 업데이트 및 재실행)
+        # 종목명 버튼 클릭 시 이벤트
         if cols[0].button(row['Name'], key=f"top_{i}"):
             st.session_state.company_name = row['Name']
             st.session_state.auto_submit = True
             st.rerun()
             
-        # 2. 종가 및 등락률 (상승/하락 색상 적용)
-        color = "red" if row['ChgRate'] > 0 else "blue" if row['ChgRate'] < 0 else "white"
+        # 수치 표시
+        color = "red" if row['ChgRate'] > 0 else "blue" if row['ChgRate'] < 0 else "gray"
         cols[1].write(f"{int(row['Close']):,}")
         cols[2].markdown(f":{color}[{row['ChgRate']:.2f}%]")
-
-except Exception as e:
-    st.sidebar.error("TOP 10 목록을 불러올 수 없습니다.")
+else:
+    st.sidebar.warning("목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.")
 
 st.sidebar.markdown("---")
 # --- [신규 추가 끝] ---
 
-# 이후 기존의 company_name 입력창 부분을 아래와 같이 'value'를 추가해 수정하세요.
-# company_name = st.sidebar.text_input('조회할 회사를 입력하세요', value=st.session_state.company_name)
-
 confirm_btn = st.sidebar.button('조회하기') # 클릭하면 True
-
-# 새로 만들기 - 한국 주식 top 10
-
 
 
 # --- 메인 로직 ---
