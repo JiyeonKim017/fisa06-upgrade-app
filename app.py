@@ -28,7 +28,7 @@ if 'auto_submit' not in st.session_state:
 def get_fixed_top_10():
     stocks = {
         '삼성전자': '005930', 'SK하이닉스': '000660', 'LG에너지솔루션': '373220',
-        '삼성바이오로직스': '207940', '현대차': '005380', '기아': '000270',
+        '삼성바이오로직스': '207940', '현대자동차': '005380', '기아': '000270',
         '셀트리온': '068270', 'KB금융': '105560', 'NAVER': '035420', '신한지주': '055550'
     }
     results = []
@@ -95,7 +95,7 @@ confirm_btn = st.sidebar.button('조회하기', use_container_width=True)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 주요 종목 10선")
-st.sidebar.caption("주식명을 클릭하면 자동 검색됩니다.")
+st.sidebar.markdown("주식명을 클릭하면 자동 검색됩니다.")
 
 with st.sidebar:
     with st.spinner("주요 주식 10선 데이터 수집 중..."):
