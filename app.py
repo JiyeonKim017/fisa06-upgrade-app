@@ -74,9 +74,12 @@ confirm_btn = st.sidebar.button('조회하기', use_container_width=True)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 주요 종목 10선")
-st.sidebar.caption("주식명을 클릭하면 자동 검색됩니다.") # 안내 문구 추가
+st.sidebar.caption("주식명을 클릭하면 자동 검색됩니다.")
 
-top_df = get_fixed_top_10()
+# 로딩 문구 수정: spinner 사용
+with st.sidebar:
+    with st.spinner("주요 주식 10선 데이터 수집 중..."):
+        top_df = get_fixed_top_10()
 
 if not top_df.empty:
     cols_h = st.sidebar.columns([2, 1, 1])
@@ -91,13 +94,13 @@ if not top_df.empty:
             st.session_state.auto_submit = True
             st.rerun()
         
-        # 컬러 버그 수정: 등락률이 0일 때 대비
+        # 컬러 태그 수정 (0%일 때 버그 방지)
         if row['ChgRate'] > 0:
             color_str = f":red[{row['ChgRate']:.1f}%]"
         elif row['ChgRate'] < 0:
             color_str = f":blue[{row['ChgRate']:.1f}%]"
         else:
-            color_str = f"{row['ChgRate']:.1f}%" # 0%일 때는 컬러 태그 없이 출력
+            color_str = f"{row['ChgRate']:.1f}%"
             
         cols[1].write(f"{int(row['Close']):,}")
         cols[2].markdown(color_str)
@@ -154,3 +157,5 @@ if confirm_btn or st.session_state.auto_submit:
                 st.error(f"데이터 조회 중 오류 발생: {e}")
         else:
             st.error("종목 코드를 찾을 수 없습니다.")
+    else:
+        st.warning("회사명을 입력하세요.")
