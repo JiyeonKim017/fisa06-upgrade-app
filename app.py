@@ -27,7 +27,7 @@ if 'auto_submit' not in st.session_state:
 def get_fixed_top_10():
     stocks = {
         '삼성전자': '005930', 'SK하이닉스': '000660', 'LG에너지솔루션': '373220',
-        '삼성바이오로직스': '207940', '현대차': '005380', '기아': '000270',
+        '삼성바이오로직스': '207940', '현대자동차': '005380', '기아': '000270',
         '셀트리온': '068270', 'KB금융': '105560', 'NAVER': '035420', '신한지주': '055550'
     }
     results = []
@@ -140,7 +140,7 @@ if confirm_btn or st.session_state.auto_submit:
                     st.subheader(f"{target} 분석 결과")
                     
                     # --- 수정 포인트: 전체 데이터 로드 및 스크롤 설정 ---
-                    st.write("전체 데이터 내역 (스크롤 가능)")
+                    st.write("전체 데이터 내역")
                     # height를 지정하면 해당 높이를 넘을 경우 자동으로 내부 스크롤이 생깁니다.
                     st.dataframe(price_df.sort_index(ascending=False), use_container_width=True, height=300)
 
