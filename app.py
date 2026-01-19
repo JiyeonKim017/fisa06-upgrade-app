@@ -58,56 +58,27 @@ selected_dates = st.sidebar.date_input(
 )
 
 
-# --- [신규 추가] 시가총액 TOP 10 목록 및 클릭 이벤트 ---
-st.sidebar.markdown("### 시가총액 TOP 10")
-
-# 세션 상태 초기화 (클릭 시 자동 조회를 위함)
-if 'company_name' not in st.session_state:
-    st.session_state.company_name = ""
-if 'auto_submit' not in st.session_state:
-    st.session_state.auto_submit = False
-
-@st.cache_data
-def get_top_10_stocks():
-    # 실시간 시가총액 순위 데이터 가져오기
-    df = fdr.StockListing('KRX')
-    top_10 = df.sort_values(by='Marcap', ascending=False).head(10)
-    return top_10[['Name', 'Close', 'ChgRate']]
-
-try:
-    top_df = get_top_10_stocks()
-    
-    # 표 헤더 출력
-    cols_header = st.sidebar.columns([2, 1, 1])
-    cols_header[0].caption("주식명")
-    cols_header[1].caption("종가")
-    cols_header[2].caption("등락률")
-
-# --- [신규 추가 및 보완] 시가총액 TOP 10 목록 ---
-st.sidebar.markdown("### 시가총액 TOP 10")
-
-# 세션 상태 초기화
-if 'company_name' not in st.session_state:
-    st.session_state.company_name = ""
-if 'auto_submit' not in st.session_state:
-    st.session_state.auto_submit = False
-
-@st.cache_data(ttl=3600)  # 1시간 동안 결과 캐싱
+# --- 1. [함수] 시가총액 TOP 10 데이터 가져오기 ---
+@st.cache_data(ttl=3600)
 def get_top_10_stocks():
     try:
-        # KRX 상장사 전체 목록 (시가총액 포함)
         df = fdr.StockListing('KRX')
-        # 시가총액 순 정렬 후 상위 10개 추출
         top_10 = df.sort_values(by='Marcap', ascending=False).head(10)
         return top_10[['Name', 'Close', 'ChgRate']]
-    except Exception as e:
-        # 에러 발생 시 빈 데이터프레임 반환하여 메인 로직 방해 방지
+    except:
         return pd.DataFrame()
 
+# --- 2. [세션 상태] 클릭 이벤트 기록용 ---
+if 'company_name' not in st.session_state:
+    st.session_state.company_name = ""
+if 'auto_submit' not in st.session_state:
+    st.session_state.auto_submit = False
+
+# --- 3. [UI] TOP 10 표 그리기 ---
+st.sidebar.markdown("### 시가총액 TOP 10")
 top_df = get_top_10_stocks()
 
 if not top_df.empty:
-    # 헤더
     h_cols = st.sidebar.columns([2, 1, 1])
     h_cols[0].caption("주식명")
     h_cols[1].caption("종가")
@@ -115,22 +86,25 @@ if not top_df.empty:
 
     for i, row in top_df.iterrows():
         cols = st.sidebar.columns([2, 1, 1])
-        
-        # 종목명 버튼 클릭 시 이벤트
         if cols[0].button(row['Name'], key=f"top_{i}"):
             st.session_state.company_name = row['Name']
             st.session_state.auto_submit = True
             st.rerun()
             
-        # 수치 표시
-        color = "red" if row['ChgRate'] > 0 else "blue" if row['ChgRate'] < 0 else "gray"
+        color = "red" if row['ChgRate'] > 0 else "blue" if row['ChgRate'] < 0 else "white"
         cols[1].write(f"{int(row['Close']):,}")
         cols[2].markdown(f":{color}[{row['ChgRate']:.2f}%]")
 else:
-    st.sidebar.warning("목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.")
+    st.sidebar.warning("데이터를 불러올 수 없습니다.")
 
 st.sidebar.markdown("---")
-# --- [신규 추가 끝] ---
+
+# --- 4. [UI] 검색창 및 날짜 입력 ---
+# value 설정이 핵심입니다.
+company_name = st.sidebar.text_input(
+    '조회할 회사를 입력하세요', 
+    value=st.session_state.company_name
+)
 
 confirm_btn = st.sidebar.button('조회하기') # 클릭하면 True
 
