@@ -13,6 +13,11 @@ load_dotenv()
 st.set_page_config(page_title="주가 데이터 분석", layout="wide")
 st.header(os.getenv('DB_NAME', '주가 데이터 분석'))
 
+today = datetime.date.today()
+
+# 날짜 세션 초기화 (기본값: 올해 1월 1일부터 오늘까지)
+if 'start_date' not in st.session_state:
+    st.session_state.start_date = datetime.date(today.year, 1, 1)
 if 'company_name' not in st.session_state:
     st.session_state.company_name = ""
 if 'auto_submit' not in st.session_state:
@@ -64,11 +69,27 @@ company_name_input = st.sidebar.text_input(
     key="search_input"
 )
 
+st.sidebar.write("조회 기간 설정")
+
+# 기간 단축 버튼 레이아웃
+date_cols = st.sidebar.columns(4)
+periods = [15, 30, 60, 120]
+for i, p in enumerate(periods):
+    if date_cols[i].button(f"{p}일"):
+        st.session_state.start_date = today - datetime.timedelta(days=p)
+        st.session_state.auto_submit = True
+        st.rerun()
+
+# 날짜 선택기 (세션 상태와 연동)
 selected_dates = st.sidebar.date_input(
-    "조회 기간",
-    (datetime.date(datetime.datetime.now().year, 1, 1), datetime.datetime.now()),
+    "날짜 범위",
+    (st.session_state.start_date, today),
     format="YYYY.MM.DD",
 )
+
+# 날짜 선택기에서 직접 변경한 경우 세션 업데이트
+if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
+    st.session_state.start_date = selected_dates[0]
 
 confirm_btn = st.sidebar.button('조회하기', use_container_width=True)
 
@@ -112,9 +133,10 @@ if confirm_btn or st.session_state.auto_submit:
         code = get_code(target)
         if code:
             try:
-                start = selected_dates[0].strftime("%Y%m%d")
-                end = selected_dates[1].strftime("%Y%m%d")
-                price_df = fdr.DataReader(code, start, end)
+                # 시작일은 세션에 저장된 값, 종료일은 오늘로 고정하여 검색
+                start_str = st.session_state.start_date.strftime("%Y%m%d")
+                end_str = today.strftime("%Y%m%d")
+                price_df = fdr.DataReader(code, start_str, end_str)
                 
                 if not price_df.empty:
                     st.subheader(f"{target} 분석 결과")
@@ -142,15 +164,8 @@ if confirm_btn or st.session_state.auto_submit:
                     fig.add_trace(go.Bar(x=price_df.index, y=price_df['Volume'], name="거래량", 
                                          marker_color=v_colors), row=2, col=1)
 
-                    # --- 휴장일(주말 및 공휴일) 제거 설정 ---
-                    # dvalue: "sat"은 토요일부터, 2는 이틀(토,일)을 의미
-                    fig.update_xaxes(
-                        rangebreaks=[
-                            dict(bounds=["sat", "mon"]), # 주말 제거
-                            dict(values=["2026-01-01", "2025-12-25"]) # 특정 공휴일 예시 (필요시 추가)
-                        ]
-                    )
-
+                    # 주말 제외 설정
+                    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
                     fig.update_layout(height=600, template="plotly_white", xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
 
