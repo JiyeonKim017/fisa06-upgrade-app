@@ -10,7 +10,16 @@ from dotenv import load_dotenv
 
 # --- 설정 및 세션 초기화 ---
 load_dotenv()
+
+# 1. 시스템 로딩 메시지를 숨기기 위한 설정 추가
 st.set_page_config(page_title="주가 데이터 분석", layout="wide")
+
+# (선택 사항) 만약 코드만으로 해결되지 않는다면 
+# 프로젝트 폴더에 .streamlit/config.toml 파일을 만들고 아래 내용을 넣으세요:
+# [client]
+# showErrorDetails = false
+# toolbarMode = "minimal"
+
 st.header(os.getenv('DB_NAME', '주가 데이터 분석'))
 
 today = datetime.date.today()
@@ -28,7 +37,7 @@ if 'auto_submit' not in st.session_state:
 def get_fixed_top_10():
     stocks = {
         '삼성전자': '005930', 'SK하이닉스': '000660', 'LG에너지솔루션': '373220',
-        '삼성바이오로직스': '207940', '현대차': '005380', '기아': '000270',
+        '삼성바이오로직스': '207940', '현대자동차': '005380', '기아': '000270',
         '셀트리온': '068270', 'KB금융': '105560', 'NAVER': '035420', '신한지주': '055550'
     }
     results = []
@@ -98,7 +107,7 @@ st.sidebar.markdown("### 주요 종목 10선")
 st.sidebar.caption("주식명을 클릭하면 자동 검색됩니다.")
 
 with st.sidebar:
-    # 60초마다 갱신되므로 훨씬 정확한 종가를 보여줍니다.
+    # 2. 로딩 중일 때 사용자 정의 메시지만 보이도록 처리
     with st.spinner("주요 주식 10선 데이터 수집 중..."):
         top_df = get_fixed_top_10()
 
@@ -143,7 +152,7 @@ if confirm_btn or st.session_state.auto_submit:
                 if not price_df.empty:
                     st.subheader(f"{target} 분석 결과")
                     
-                    st.write("전체 데이터 내역 (스크롤 가능)")
+                    st.write("전체 데이터 내역")
                     # 최신순 정렬 + 스크롤 높이 지정
                     st.dataframe(price_df.sort_index(ascending=False), use_container_width=True, height=350)
 
