@@ -64,7 +64,7 @@ def get_code(name):
     return codes[0] if len(codes) > 0 else None
 
 # --- 사이드바 UI ---
-# 입력창: 세션 상태와 연동
+# 입력창: 세션 상태와 동기화
 company_name_input = st.sidebar.text_input(
     '조회할 회사를 입력하세요', 
     value=st.session_state.company_name,
@@ -72,13 +72,14 @@ company_name_input = st.sidebar.text_input(
 )
 
 st.sidebar.write("조회 기간 설정")
-# 기간 설정 버튼
+# 기간 설정 버튼 (15일, 30일, 60일, 120일)
 date_cols = st.sidebar.columns(4)
 periods = [15, 30, 60, 120]
 for i, p in enumerate(periods):
     if date_cols[i].button(f"{p}일"):
-        # 핵심: 버튼 클릭 시 현재 텍스트창 내용을 세션에 즉시 반영하여 초기화 방지
-        st.session_state.company_name = company_name_input
+        # 입력창에 써놓은 값이 있다면 세션에 저장하여 검색 유지
+        if company_name_input:
+            st.session_state.company_name = company_name_input
         st.session_state.start_date = today - datetime.timedelta(days=p)
         st.session_state.auto_submit = True
         st.rerun()
@@ -90,7 +91,7 @@ selected_dates = st.sidebar.date_input(
     format="YYYY.MM.DD",
 )
 
-# 날짜 직접 변경 시 세션 업데이트
+# 날짜 직접 선택 시 세션 업데이트
 if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
     st.session_state.start_date = selected_dates[0]
 
@@ -112,6 +113,7 @@ if not top_df.empty:
 
     for i, row in top_df.iterrows():
         cols = st.sidebar.columns([2, 1, 1])
+        # 주요 종목 버튼 클릭 시 즉시 검색 실행 로직 복구
         if cols[0].button(row['Name'], key=f"btn_{i}"):
             st.session_state.company_name = row['Name']
             st.session_state.auto_submit = True
@@ -129,8 +131,10 @@ if not top_df.empty:
 
 # --- 메인 분석 로직 ---
 if confirm_btn or st.session_state.auto_submit:
-    # 텍스트창 값 또는 세션값 중 최신 것을 타겟으로 설정
+    # 텍스트창 입력 우선, 없으면 세션에 저장된 종목(주요 종목 클릭 등) 사용
     target = company_name_input if confirm_btn else st.session_state.company_name
+    
+    # 최종 선택된 종목을 세션에 다시 저장하여 기간 변경 시 유지되도록 함
     st.session_state.company_name = target
     st.session_state.auto_submit = False
     
@@ -145,12 +149,15 @@ if confirm_btn or st.session_state.auto_submit:
                 if not price_df.empty:
                     st.subheader(f"{target} 분석 결과")
                     
+                    # 1. 데이터 표 출력
                     st.write("최근 데이터 내역")
                     st.dataframe(price_df.tail(5), use_container_width=True)
 
+                    # 지표 계산
                     for n in [5, 20, 60, 120]:
                         price_df[f'MA{n}'] = price_df['Close'].rolling(n).mean()
 
+                    # 2. 캔들 + 이동평균선 + 거래량 차트
                     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                                         vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
@@ -177,6 +184,7 @@ if confirm_btn or st.session_state.auto_submit:
                     fig.update_layout(height=600, template="plotly_white", xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
 
+                    # 3. 엑셀 다운로드
                     out = BytesIO()
                     with pd.ExcelWriter(out, engine='openpyxl') as w:
                         price_df.to_excel(w, index=True)
