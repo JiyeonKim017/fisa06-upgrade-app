@@ -15,7 +15,7 @@ st.header(os.getenv('DB_NAME', '주가 데이터 분석'))
 
 today = datetime.date.today()
 
-# 날짜 세션 초기화 (기본값: 올해 1월 1일부터 오늘까지)
+# 세션 상태 관리
 if 'start_date' not in st.session_state:
     st.session_state.start_date = datetime.date(today.year, 1, 1)
 if 'company_name' not in st.session_state:
@@ -23,13 +23,12 @@ if 'company_name' not in st.session_state:
 if 'auto_submit' not in st.session_state:
     st.session_state.auto_submit = False
 
-
 # --- 데이터 획득 함수 ---
 @st.cache_data(ttl=3600)
 def get_fixed_top_10():
     stocks = {
         '삼성전자': '005930', 'SK하이닉스': '000660', 'LG에너지솔루션': '373220',
-        '삼성바이오로직스': '207940', '현대자동차': '005380', '기아': '000270',
+        '삼성바이오로직스': '207940', '현대차': '005380', '기아': '000270',
         '셀트리온': '068270', 'KB금융': '105560', 'NAVER': '035420', '신한지주': '055550'
     }
     results = []
@@ -57,6 +56,7 @@ def get_krx_list():
         return pd.DataFrame(columns=['회사명', '종목코드'])
 
 def get_code(name):
+    if not name: return None
     if name.isdigit() and len(name) == 6:
         return name
     df = get_krx_list()
@@ -64,6 +64,7 @@ def get_code(name):
     return codes[0] if len(codes) > 0 else None
 
 # --- 사이드바 UI ---
+# 입력창: 세션 상태와 연동
 company_name_input = st.sidebar.text_input(
     '조회할 회사를 입력하세요', 
     value=st.session_state.company_name,
@@ -71,24 +72,25 @@ company_name_input = st.sidebar.text_input(
 )
 
 st.sidebar.write("조회 기간 설정")
-
-# 기간 단축 버튼 레이아웃
+# 기간 설정 버튼
 date_cols = st.sidebar.columns(4)
 periods = [15, 30, 60, 120]
 for i, p in enumerate(periods):
     if date_cols[i].button(f"{p}일"):
+        # 핵심: 버튼 클릭 시 현재 텍스트창 내용을 세션에 즉시 반영하여 초기화 방지
+        st.session_state.company_name = company_name_input
         st.session_state.start_date = today - datetime.timedelta(days=p)
         st.session_state.auto_submit = True
         st.rerun()
 
-# 날짜 선택기 (세션 상태와 연동)
+# 날짜 선택 위젯
 selected_dates = st.sidebar.date_input(
     "날짜 범위",
     (st.session_state.start_date, today),
     format="YYYY.MM.DD",
 )
 
-# 날짜 선택기에서 직접 변경한 경우 세션 업데이트
+# 날짜 직접 변경 시 세션 업데이트
 if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
     st.session_state.start_date = selected_dates[0]
 
@@ -96,7 +98,7 @@ confirm_btn = st.sidebar.button('조회하기', use_container_width=True)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 주요 종목 10선")
-st.sidebar.markdown("주식명을 클릭하면 자동 검색됩니다.")
+st.sidebar.caption("주식명을 클릭하면 자동 검색됩니다.")
 
 with st.sidebar:
     with st.spinner("주요 주식 10선 데이터 수집 중..."):
@@ -127,14 +129,15 @@ if not top_df.empty:
 
 # --- 메인 분석 로직 ---
 if confirm_btn or st.session_state.auto_submit:
-    target = st.session_state.company_name if st.session_state.auto_submit else company_name_input
+    # 텍스트창 값 또는 세션값 중 최신 것을 타겟으로 설정
+    target = company_name_input if confirm_btn else st.session_state.company_name
+    st.session_state.company_name = target
     st.session_state.auto_submit = False
     
     if target:
         code = get_code(target)
         if code:
             try:
-                # 시작일은 세션에 저장된 값, 종료일은 오늘로 고정하여 검색
                 start_str = st.session_state.start_date.strftime("%Y%m%d")
                 end_str = today.strftime("%Y%m%d")
                 price_df = fdr.DataReader(code, start_str, end_str)
@@ -165,8 +168,12 @@ if confirm_btn or st.session_state.auto_submit:
                     fig.add_trace(go.Bar(x=price_df.index, y=price_df['Volume'], name="거래량", 
                                          marker_color=v_colors), row=2, col=1)
 
-                    # 주말 제외 설정
+                    # 빈 공간(휴장일) 제거
                     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+                    all_days = pd.date_range(start=price_df.index[0], end=price_df.index[-1])
+                    holidays = all_days.difference(price_df.index)
+                    fig.update_xaxes(rangebreaks=[dict(values=holidays)])
+
                     fig.update_layout(height=600, template="plotly_white", xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
 
