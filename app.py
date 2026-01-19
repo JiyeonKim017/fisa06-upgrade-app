@@ -58,6 +58,10 @@ selected_dates = st.sidebar.date_input(
 )
 confirm_btn = st.sidebar.button('조회하기') # 클릭하면 True
 
+# 새로 만들기 - 한국 주식 top 10
+
+
+
 # --- 메인 로직 ---
 if confirm_btn:
     if not company_name: # '' 
@@ -74,7 +78,7 @@ if confirm_btn:
             if price_df.empty:
                 st.info("해당 기간의 주가 데이터가 없습니다.")
             else:
-                st.subheader(f"[{company_name}] 주가 데이터")
+                st.subheader(f"{company_name} 주가 데이터")
                 st.dataframe(price_df.tail(10), width="stretch")
 
                 # Matplotlib 시각화
@@ -87,28 +91,60 @@ if confirm_btn:
                 import plotly.graph_objects as go
                 import streamlit as st
 
-                # 1. 캔들스틱 차트 객체 생성
-                fig = go.Figure(data=[go.Candlestick(
+                # 1. 이동평균선 데이터 계산
+                price_df['MA5'] = price_df['Close'].rolling(window=5).mean()
+                price_df['MA20'] = price_df['Close'].rolling(window=20).mean()
+                price_df['MA60'] = price_df['Close'].rolling(window=60).mean()
+                price_df['MA120'] = price_df['Close'].rolling(window=120).mean()
+
+                # 2. 기본 캔들스틱 차트 생성
+                fig = go.Figure()
+
+                # 캔들스틱 추가
+                fig.add_trace(go.Candlestick(
                     x=price_df.index,
                     open=price_df['Open'],
                     high=price_df['High'],
                     low=price_df['Low'],
                     close=price_df['Close'],
-                    increasing_line_color='red', # 상승 시 빨간색
-                    decreasing_line_color='blue' # 하락 시 파란색
-                )])
+                    name="주가",
+                    increasing_line_color='#FF3333',
+                    decreasing_line_color='#3333FF',
+                    # 마우스 오버 시 표시될 텍스트 커스텀
+                    customdata=price_df['Volume'],
+                    hovertemplate="<b>날짜: %{x}</b><br>종가: %{close:,.0f}원<br>거래량: %{customdata:,.0f}<extra></extra>"
+                ))
 
-                # 2. 레이아웃 설정
+                # 3. 이동평균선 추가 (각각 다른 색상으로 설정)
+                ma_list = [
+                    ('MA5', 'green', '5일선'),
+                    ('MA20', 'red', '20일선'),
+                    ('MA60', 'orange', '60일선'),
+                    ('MA120', 'purple', '120일선')
+                ]
+
+                for col, color, name in ma_list:
+                    fig.add_trace(go.Scatter(
+                        x=price_df.index, 
+                        y=price_df[col], 
+                        mode='lines',
+                        line=dict(color=color, width=1),
+                        name=name,
+                        hoverinfo='skip' # 선 위에서는 툴팁이 안 뜨게 설정 (캔들 정보에 집중)
+                    ))
+
+                # 4. 레이아웃 설정
                 fig.update_layout(
-                    title=f"{company_name} 주가 추이 (캔들스틱)",
+                    title=f"<b>{company_name} 주가 및 이동평균선</b>",
                     xaxis_title="날짜",
                     yaxis_title="가격",
-                    xaxis_rangeslider_visible=False, # 하단 슬라이더 제거 (깔끔하게 보려면 False)
                     height=600,
-                    template="plotly_white"
+                    template="plotly_white",
+                    xaxis_rangeslider_visible=False,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                 )
 
-                # 3. 스트림릿 출력
+                # 5. 스트림릿 출력
                 st.plotly_chart(fig, use_container_width=True)
 
 
